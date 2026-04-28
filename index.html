@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>ASVP Survivor</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<style>
+html,body{margin:0;background:#070707;overflow:hidden;font-family:monospace;color:white}
+canvas{display:block;width:100vw;height:100vh;background:#111}
+#menu,#levelup{position:fixed;inset:0;background:#000c;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:10;text-align:center}
+button{font-size:20px;margin:10px;padding:14px 22px;border:2px solid white;background:#111;color:white;border-radius:8px}
+.card{border:2px solid white;padding:15px;margin:8px;width:260px;background:#222}
+</style>
+</head>
+<body>
+
+<div id="menu">
+  <h1>ASVP SURVIVOR</h1>
+  <p>Choisis ton ASVP</p>
+  <button onclick="choosePlayer(0)">ASVP 1</button>
+  <button onclick="choosePlayer(1)">ASVP 2</button>
+  <button onclick="startGame()">START</button>
+</div>
+
+<div id="levelup" style="display:none">
+  <h1>LEVEL UP</h1>
+  <div id="choices"></div>
+</div>
+
+<canvas id="game"></canvas>
+
+<script>
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+function resize(){canvas.width=innerWidth;canvas.height=innerHeight}
+resize(); addEventListener("resize",resize);
+
+let selectedPlayer=0;
+let running=false;
+let level=1,xp=0,xpNeed=10,score=0;
+let player={x:400,y:250,r:16,speed:3,hp:100};
+let joy={active:false,x:0,y:0,dx:0,dy:0};
+
+let zombies=[], bullets=[], explosions=[], gases=[], cars=[];
+let weapons={
+ flashball:{lvl:1,cd:900,last:0},
+ crepe:{lvl:0,cd:2600,last:0},
+ teddy:{lvl:0,cd:5000,last:0},
+ kangoo:{lvl:0,cd:12000,last:0}
+};
+
+function choosePlayer(n){selectedPlayer=n}
+
+function startGame(){
+ document.getElementById("menu").style.display="none";
+ running=true;
+ lastTime=performance.now();
+ requestAnimationFrame(loop);
+}
+
+function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
+
+function nearestZombie(){
+ let best=null,bd=999999;
+ for(const z of zombies){
+  let d=dist(player,z);
+  if(d<bd){bd=d;best=z}
+ }
+ return best;
+}
+
+function spawnZombie(){
+ const edge=Math.floor(Math.random()*4);
+ let x,y;
+ if(edge===0){x=Math.random()*canvas.width;y=-30}
+ if(edge===1){x=canvas.width+30;y=Math.random()*canvas.height}
+ if(edge===2){x=Math.random()*canvas.width;y=canvas.height+30}
+ if(edge===3){x=-30;y=Math.random()*canvas.height}
+ zombies.push({
+  x,y,r:14+Math.random()*4,
+  hp:20+level*4,
+  speed:0.55+Math.random()*0.45+level*0.02,
+  type:Math.floor(Math.random()*4)
+ });
+}
+
+function fireFlashball(now){
+ if(now-weapons.flashball.last<weapons.flashball.cd)return;
+ let z=nearestZombie(); if(!z)return;
+ weapons.flashball.last=now;
+ let dx=z.x-player.x,dy=z.y-player.y,d=Math.hypot(dx,dy)||1;
+ bullets.push({x:player.x,y:player.y,vx:dx/d*6,vy:dy/d*6,r:5,dmg:18+weapons.flashball.lvl*5,life:80,type:"flash"});
+}
+
+function fireCrepe(now){
+ if(!weapons.crepe.lvl||now-weapons.crepe.last<weapons.crepe.cd)return;
+ let z=nearestZombie(); if(!z)return;
+ weapons.crepe.last=now;
+ let dx=z.x-player.x,dy=z.y-player.y,d=Math.hypot(dx,dy)||1;
+ bullets.push({x:player.x,y:player.y,vx:dx/d*4.5,vy:dy/d*4.5,r:9,dmg:30+weapons.crepe.lvl*10,life:90,type:"crepe"});
+}
+
+function fireTeddy(now){
+ if(!weapons.teddy.lvl||now-weapons.teddy.last<weapons.teddy.cd)return;
+ let z=nearestZombie(); if(!z)return;
+ weapons.teddy.last=now;
+ let dx=z.x-player.x,dy=z.y-player.y,d=Math.hypot(dx,dy)||1;
+ bullets.push({x:player.x,y:player.y,vx:dx/d*3.8,vy:dy/d*3.8,r:7,dmg:0,life:90,type:"teddy"});
+}
+
+function fireKangoo(now){
+ if(!weapons.kangoo.lvl||now-weapons.kangoo.last<weapons.kangoo.cd)return;
+ weapons.kangoo.last=now;
+ cars.push({x:-120,y:Math.random()*canvas.height,vx:8+weapons.kangoo.lvl*2,life:180});
+}
+
+function damageZombie(z,dmg){
+ z.hp-=dmg;
+ if(z.hp<=0){
+  xp++;
+  score++;
+  zombies.splice(zombies.indexOf(z),1);
+  if(xp>=xpNeed)levelUp();
+ }
+}
+
+function levelUp(){
+ running=false;
+ level++; xp=0; xpNeed=Math.floor(xpNeed*1.35);
+ const div=document.getElementById("choices");
+ div.innerHTML="";
+ const opts=[
+  ["Améliorer Flashball PM",()=>weapons.flashball.lvl++],
+  ["Débloquer / améliorer Crêpe bretonne",()=>weapons.crepe.lvl++],
+  ["Débloquer / améliorer Pet de Teddy",()=>weapons.teddy.lvl++],
+  ["Débloquer / améliorer Kangoo",()=>weapons.kangoo.lvl++]
+ ];
+ opts.sort(()=>Math.random()-0.5).slice(0,3).forEach(o=>{
+  let b=document.createElement("button");
+  b.textContent=o[0];
+  b.onclick=()=>{o[1]();document.getElementById("levelup").style.display="none";running=true;requestAnimationFrame(loop)};
+  div.appendChild(b);
+ });
+ document.getElementById("levelup").style.display="flex";
+}
+
+canvas.addEventListener("touchstart",e=>{
+ const t=e.touches[0]; joy.active=true; joy.x=t.clientX; joy.y=t.clientY;
+});
+canvas.addEventListener("touchmove",e=>{
+ const t=e.touches[0];
+ joy.dx=t.clientX-joy.x; joy.dy=t.clientY-joy.y;
+});
+canvas.addEventListener("touchend",()=>{joy.active=false;joy.dx=0;joy.dy=0});
+
+let keys={};
+addEventListener("keydown",e=>keys[e.key]=true);
+addEventListener("keyup",e=>keys[e.key]=false);
+
+function update(now){
+ if(Math.random()<0.035+level*0.002)spawnZombie();
+
+ let mx=0,my=0;
+ if(keys.ArrowLeft||keys.q)mx=-1;
+ if(keys.ArrowRight||keys.d)mx=1;
+ if(keys.ArrowUp||keys.z)my=-1;
+ if(keys.ArrowDown||keys.s)my=1;
+ if(joy.active){mx=joy.dx/60;my=joy.dy/60}
+ let m=Math.hypot(mx,my)||1;
+ player.x+=mx/m*player.speed;
+ player.y+=my/m*player.speed;
+ player.x=Math.max(20,Math.min(canvas.width-20,player.x));
+ player.y=Math.max(20,Math.min(canvas.height-20,player.y));
+
+ for(const z of zombies){
+  let dx=player.x-z.x,dy=player.y-z.y,d=Math.hypot(dx,dy)||1;
+  z.x+=dx/d*z.speed;
+  z.y+=dy/d*z.speed;
+  if(d<z.r+player.r)player.hp-=0.08;
+ }
+
+ fireFlashball(now);
+ fireCrepe(now);
+ fireTeddy(now);
+ fireKangoo(now);
+
+ for(let i=bullets.length-1;i>=0;i--){
+  let b=bullets[i]; b.x+=b.vx; b.y+=b.vy; b.life--;
+  for(const z of [...zombies]){
+   if(dist(b,z)<b.r+z.r){
+    if(b.type==="flash"){damageZombie(z,b.dmg)}
+    if(b.type==="crepe"){explosions.push({x:b.x,y:b.y,r:55+weapons.crepe.lvl*8,life:18,dmg:b.dmg})}
+    if(b.type==="teddy"){gases.push({x:b.x,y:b.y,r:65+weapons.teddy.lvl*10,life:300,dmg:0.25+weapons.teddy.lvl*0.08})}
+    bullets.splice(i,1); break;
+   }
+  }
+  if(b.life<=0)bullets.splice(i,1);
+ }
+
+ for(const ex of explosions){
+  ex.life--;
+  for(const z of [...zombies])if(dist(ex,z)<ex.r)damageZombie(z,ex.dmg);
+ }
+ explosions=explosions.filter(e=>e.life>0);
+
+ for(const g of gases){
+  g.life--;
+  for(const z of [...zombies])if(dist(g,z)<g.r)damageZombie(z,g.dmg);
+ }
+ gases=gases.filter(g=>g.life>0);
+
+ for(const c of cars){
+  c.x+=c.vx; c.life--;
+  for(const z of [...zombies])if(Math.abs(z.x-c.x)<55&&Math.abs(z.y-c.y)<28)damageZombie(z,999);
+ }
+ cars=cars.filter(c=>c.life>0 && c.x<canvas.width+160);
+
+ if(player.hp<=0){running=false;alert("GAME OVER - Score : "+score);location.reload()}
+}
+
+function drawPlayer(){
+ ctx.save(); ctx.translate(player.x,player.y);
+ ctx.fillStyle=selectedPlayer===0?"#1c2f5a":"#26364f";
+ ctx.fillRect(-13,-12,26,28);
+ ctx.fillStyle="#f0b28a"; ctx.fillRect(-10,-28,20,18);
+ ctx.fillStyle=selectedPlayer===0?"#3b2417":"#111"; ctx.fillRect(-11,-32,22,8);
+ if(selectedPlayer===1){ctx.strokeStyle="white";ctx.strokeRect(-8,-24,6,4);ctx.strokeRect(2,-24,6,4)}
+ ctx.fillStyle="white";ctx.font="8px monospace";ctx.fillText("ASVP",-11,5);
+ ctx.restore();
+}
+
+function drawZombie(z){
+ ctx.save(); ctx.translate(z.x,z.y);
+ ctx.fillStyle="#79a85b"; ctx.fillRect(-9,-24,18,18);
+ ctx.fillStyle=["#555","#633","#335","#735"][z.type]; ctx.fillRect(-11,-6,22,25);
+ ctx.fillStyle="#1d3355"; ctx.fillRect(-9,18,7,14); ctx.fillRect(2,18,7,14);
+ ctx.fillStyle="red"; ctx.fillRect(3,-15,3,3);
+ ctx.restore();
+}
+
+function draw(){
+ ctx.fillStyle="#151515"; ctx.fillRect(0,0,canvas.width,canvas.height);
+
+ ctx.strokeStyle="#333";
+ for(let x=0;x<canvas.width;x+=60){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,canvas.height);ctx.stroke()}
+ for(let y=0;y<canvas.height;y+=60){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(canvas.width,y);ctx.stroke()}
+
+ for(const g of gases){ctx.fillStyle="rgba(60,255,20,.25)";ctx.beginPath();ctx.arc(g.x,g.y,g.r,0,7);ctx.fill()}
+ for(const ex of explosions){ctx.fillStyle="rgba(255,150,20,.65)";ctx.beginPath();ctx.arc(ex.x,ex.y,ex.r*(ex.life/18),0,7);ctx.fill()}
+ for(const c of cars){ctx.fillStyle="#eee";ctx.fillRect(c.x-50,c.y-22,100,44);ctx.fillStyle="red";ctx.fillRect(c.x-42,c.y-18,70,8);ctx.fillStyle="#ffaa00";ctx.fillRect(c.x-5,c.y-32,10,10)}
+
+ zombies.forEach(drawZombie);
+
+ bullets.forEach(b=>{
+  if(b.type==="flash")ctx.fillStyle="#ddd";
+  if(b.type==="crepe")ctx.fillStyle="#b56b25";
+  if(b.type==="teddy")ctx.fillStyle="#51d13b";
+  ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,7);ctx.fill();
+ });
+
+ drawPlayer();
+
+ ctx.fillStyle="white";ctx.font="16px monospace";
+ ctx.fillText("LVL "+level+"  XP "+xp+"/"+xpNeed+"  SCORE "+score,15,25);
+ ctx.fillStyle="red";ctx.fillRect(15,35,100,8);
+ ctx.fillStyle="lime";ctx.fillRect(15,35,player.hp,8);
+}
+
+let lastTime=0;
+function loop(now){
+ if(!running)return;
+ update(now);
+ draw();
+ requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>
