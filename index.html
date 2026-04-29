@@ -5,52 +5,12 @@
 <title>ASVP Survivor</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <style>
-html,body{
-  margin:0;
-  background:#050505;
-  overflow:hidden;
-  font-family:monospace;
-  color:white;
-  touch-action:none;
-}
-canvas{
-  display:block;
-  width:100vw;
-  height:100vh;
-  image-rendering:pixelated;
-}
-.screen{
-  position:fixed;
-  inset:0;
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  justify-content:center;
-  background:#000c;
-  z-index:10;
-  text-align:center;
-}
-button{
-  font-family:monospace;
-  font-size:22px;
-  padding:15px 25px;
-  margin:10px;
-  border:3px solid white;
-  background:#111;
-  color:white;
-  border-radius:10px;
-}
-.card{
-  border:3px solid white;
-  padding:15px;
-  margin:12px;
-  background:#111d;
-  width:260px;
-}
-.card img{
-  max-width:160px;
-  max-height:160px;
-}
+html,body{margin:0;background:#050505;overflow:hidden;font-family:monospace;color:white;touch-action:none}
+canvas{display:block;width:100vw;height:100vh;image-rendering:pixelated}
+.screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#000c;z-index:10;text-align:center}
+button{font-family:monospace;font-size:22px;padding:15px 25px;margin:10px;border:3px solid white;background:#111;color:white;border-radius:10px}
+.card{border:3px solid white;padding:15px;margin:12px;background:#111d;width:260px}
+.card img{max-width:160px;max-height:160px}
 </style>
 </head>
 
@@ -90,7 +50,6 @@ button{
 <script>
 const canvas=document.getElementById("game");
 const ctx=canvas.getContext("2d");
-ctx.imageSmoothingEnabled=false;
 
 function resize(){
   canvas.width=innerWidth;
@@ -100,7 +59,7 @@ function resize(){
 resize();
 addEventListener("resize",resize);
 
-const ZOOM=0.8;
+const ZOOM=0.6;
 
 const MAP_W=4200;
 const MAP_H=3200;
@@ -147,41 +106,10 @@ let joy={active:false,x:0,y:0,dx:0,dy:0};
 let keys={};
 
 let weapons={
-  flashball:{
-    owned:true,
-    name:"Flashball PM",
-    dmg:22,
-    cd:850,
-    last:0,
-    speed:8,
-    level:1
-  },
-  crepe:{
-    owned:false,
-    name:"Crêpe bretonne",
-    dmg:45,
-    cd:3200,
-    last:0,
-    speed:5,
-    level:0
-  },
-  pet:{
-    owned:false,
-    name:"Pet de Teddy",
-    dmg:4,
-    cd:5500,
-    last:0,
-    speed:4.5,
-    level:0
-  },
-  kangou:{
-    owned:false,
-    name:"Kangou",
-    dmg:999,
-    cd:22000,
-    last:0,
-    level:0
-  }
+  flashball:{owned:true,name:"Flashball PM",dmg:35,cd:600,last:0,speed:10,level:1},
+  crepe:{owned:false,name:"Crêpe bretonne",dmg:45,cd:3200,last:0,speed:5,level:0},
+  pet:{owned:false,name:"Pet de Teddy",dmg:4,cd:5500,last:0,speed:4.5,level:0},
+  kangou:{owned:false,name:"Kangou",dmg:999,cd:22000,last:0,level:0}
 };
 
 function showSelect(){
@@ -193,9 +121,9 @@ function startGame(choice){
   selectedPlayer=choice;
 
   if(choice===1){
-    player={x:MAP_W/2,y:MAP_H/2,r:28,speed:3.2,hp:120,maxHp:120,img:assets.asvp1};
+    player={x:MAP_W/2,y:MAP_H/2,r:24,speed:3.2,hp:120,maxHp:120,img:assets.asvp1,aimX:1,aimY:0};
   }else{
-    player={x:MAP_W/2,y:MAP_H/2,r:28,speed:4.1,hp:85,maxHp:85,img:assets.asvp2};
+    player={x:MAP_W/2,y:MAP_H/2,r:24,speed:4.1,hp:85,maxHp:85,img:assets.asvp2,aimX:1,aimY:0};
   }
 
   document.getElementById("select").style.display="none";
@@ -216,25 +144,16 @@ function difficulty(now){
 function cam(){
   const viewW=canvas.width/ZOOM;
   const viewH=canvas.height/ZOOM;
-
-  return {
-    x:player.x-viewW/2,
-    y:player.y-viewH/2,
-    w:viewW,
-    h:viewH
-  };
+  return {x:player.x-viewW/2,y:player.y-viewH/2,w:viewW,h:viewH};
 }
 
 function screenX(x,c){return (x-c.x)*ZOOM}
 function screenY(y,c){return (y-c.y)*ZOOM}
 
-function dist(a,b){
-  return Math.hypot(a.x-b.x,a.y-b.y);
-}
+function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
 
 function nearestZombie(){
-  let best=null;
-  let bd=999999;
+  let best=null,bd=999999;
   for(const z of zombies){
     const d=dist(player,z);
     if(d<bd){bd=d;best=z}
@@ -262,33 +181,11 @@ function spawnZombie(now){
 
   let hp,speed,r,img;
 
-  if(type==="light"){
-    hp=18+d*105;
-    speed=0.75+d*1.25;
-    r=24;
-    img=assets.zLight;
-  }
+  if(type==="light"){hp=18+d*105;speed=0.75+d*1.25;r=24;img=assets.zLight}
+  if(type==="medium"){hp=35+d*190;speed=0.58+d*0.95;r=28;img=assets.zMedium}
+  if(type==="heavy"){hp=80+d*330;speed=0.38+d*0.65;r=34;img=assets.zHeavy}
 
-  if(type==="medium"){
-    hp=35+d*190;
-    speed=0.58+d*0.95;
-    r=28;
-    img=assets.zMedium;
-  }
-
-  if(type==="heavy"){
-    hp=80+d*330;
-    speed=0.38+d*0.65;
-    r=34;
-    img=assets.zHeavy;
-  }
-
-  zombies.push({
-    x,y,type,img,r,
-    hp,
-    maxHp:hp,
-    speed
-  });
+  zombies.push({x,y,type,img,r,hp,maxHp:hp,speed});
 }
 
 function damageZombie(z,dmg){
@@ -306,15 +203,15 @@ function shoot(type,z,speed,dmg,r){
   let dy=z.y-player.y;
   let d=Math.hypot(dx,dy)||1;
 
+  player.aimX=dx/d;
+  player.aimY=dy/d;
+
   bullets.push({
-    x:player.x,
-    y:player.y,
+    x:player.x+player.aimX*32,
+    y:player.y+player.aimY*20,
     vx:dx/d*speed,
     vy:dy/d*speed,
-    type,
-    dmg,
-    r,
-    life:160
+    type,dmg,r,life:160
   });
 }
 
@@ -323,7 +220,7 @@ function fireWeapons(now){
 
   if(z && now-weapons.flashball.last>weapons.flashball.cd){
     weapons.flashball.last=now;
-    shoot("flashball",z,weapons.flashball.speed,weapons.flashball.dmg,10);
+    shoot("flashball",z,weapons.flashball.speed,weapons.flashball.dmg,8);
   }
 
   if(weapons.crepe.owned && z && now-weapons.crepe.last>weapons.crepe.cd){
@@ -350,10 +247,10 @@ function spawnKangous(){
     const y=(MAP_H/(count+1))*(i+1)+Math.random()*80-40;
 
     cars.push({
-      x:fromLeft?-250:MAP_W+250,
+      x:fromLeft?-500:MAP_W+500,
       y,
-      vx:fromLeft?12:-12,
-      life:600,
+      vx:fromLeft?14:-14,
+      life:750,
       dmg:weapons.kangou.dmg
     });
   }
@@ -373,28 +270,19 @@ function levelUp(){
     if(!w.owned && key!=="flashball"){
       options.push({
         text:"Nouvelle arme : "+w.name,
-        action:()=>{
-          w.owned=true;
-          w.level=1;
-        }
+        action:()=>{w.owned=true;w.level=1}
       });
     }
 
     if(w.owned){
       options.push({
         text:"+ Dégâts : "+w.name,
-        action:()=>{
-          w.dmg*=key==="kangou"?1.35:1.25;
-          w.level++;
-        }
+        action:()=>{w.dmg*=key==="kangou"?1.6:1.45;w.level++}
       });
 
       options.push({
         text:"+ Vitesse attaque : "+w.name,
-        action:()=>{
-          w.cd=Math.max(250,w.cd*(key==="kangou"?0.9:0.85));
-          w.level++;
-        }
+        action:()=>{w.cd=Math.max(150,w.cd*(key==="kangou"?0.85:0.7));w.level++}
       });
     }
   }
@@ -444,11 +332,11 @@ addEventListener("keyup",e=>keys[e.key]=false);
 function update(now){
   const d=difficulty(now);
 
-  const targetZombies=Math.floor(15+d*(MAX_ZOMBIES-15));
-  const spawnChance=0.02+d*0.22;
+  const targetZombies=Math.floor(18+d*(MAX_ZOMBIES-18));
+  const spawnChance=0.012+d*0.075;
 
   if(zombies.length<targetZombies && Math.random()<spawnChance){
-    const amount=1+Math.floor(d*4);
+    const amount=Math.floor(1+d*2);
     for(let i=0;i<amount;i++)spawnZombie(now);
   }
 
@@ -472,15 +360,35 @@ function update(now){
   player.y=Math.max(80,Math.min(MAP_H-80,player.y));
 
   for(const z of zombies){
-    const dx=player.x-z.x;
-    const dy=player.y-z.y;
-    const dd=Math.hypot(dx,dy)||1;
+    let dx=player.x-z.x;
+    let dy=player.y-z.y;
 
+    let avgX=0,avgY=0,count=0;
+
+    for(const other of zombies){
+      if(other===z)continue;
+      const d2=Math.hypot(z.x-other.x,z.y-other.y);
+      if(d2<140){
+        avgX+=other.x;
+        avgY+=other.y;
+        count++;
+      }
+    }
+
+    if(count>0){
+      avgX/=count;
+      avgY/=count;
+      const groupInfluence=0.38;
+      dx=dx*(1-groupInfluence)+(avgX-z.x)*groupInfluence;
+      dy=dy*(1-groupInfluence)+(avgY-z.y)*groupInfluence;
+    }
+
+    const dd=Math.hypot(dx,dy)||1;
     z.x+=dx/dd*z.speed;
     z.y+=dy/dd*z.speed;
 
-    if(dd<z.r+player.r){
-      player.hp-=0.08+d*0.16;
+    if(Math.hypot(player.x-z.x,player.y-z.y)<z.r+player.r){
+      player.hp-=Math.min(0.3,0.08+d*0.16);
     }
   }
 
@@ -495,31 +403,14 @@ function update(now){
     for(const z of [...zombies]){
       if(Math.hypot(b.x-z.x,b.y-z.y)<b.r+z.r){
 
-        if(b.type==="flashball"){
-          damageZombie(z,b.dmg);
-        }
+        if(b.type==="flashball")damageZombie(z,b.dmg);
 
         if(b.type==="crepe"){
-          effects.push({
-            type:"crepeFx",
-            x:b.x,
-            y:b.y,
-            r:105,
-            life:32,
-            dmg:b.dmg,
-            hit:[]
-          });
+          effects.push({type:"crepeFx",x:b.x,y:b.y,r:120,life:34,dmg:b.dmg,hit:[]});
         }
 
         if(b.type==="pet"){
-          effects.push({
-            type:"petFx",
-            x:b.x,
-            y:b.y,
-            r:120,
-            life:300,
-            dmg:b.dmg
-          });
+          effects.push({type:"petFx",x:b.x,y:b.y,r:135,life:300,dmg:b.dmg});
         }
 
         bullets.splice(i,1);
@@ -544,9 +435,7 @@ function update(now){
 
     if(e.type==="petFx"){
       for(const z of [...zombies]){
-        if(Math.hypot(e.x-z.x,e.y-z.y)<e.r){
-          damageZombie(z,e.dmg);
-        }
+        if(Math.hypot(e.x-z.x,e.y-z.y)<e.r)damageZombie(z,e.dmg);
       }
     }
   }
@@ -558,13 +447,13 @@ function update(now){
     car.life--;
 
     for(const z of [...zombies]){
-      if(Math.abs(z.x-car.x)<135 && Math.abs(z.y-car.y)<55){
+      if(Math.abs(z.x-car.x)<250 && Math.abs(z.y-car.y)<110){
         damageZombie(z,car.dmg);
       }
     }
   }
 
-  cars=cars.filter(c=>c.life>0 && c.x>-400 && c.x<MAP_W+400);
+  cars=cars.filter(c=>c.life>0 && c.x>-700 && c.x<MAP_W+700);
 
   if(player.hp<=0){
     running=false;
@@ -575,13 +464,7 @@ function update(now){
 
 function drawImg(image,x,y,w,h,c){
   if(!image.complete || image.naturalWidth===0)return;
-  ctx.drawImage(
-    image,
-    screenX(x,c)-w*ZOOM/2,
-    screenY(y,c)-h*ZOOM/2,
-    w*ZOOM,
-    h*ZOOM
-  );
+  ctx.drawImage(image,screenX(x,c)-w*ZOOM/2,screenY(y,c)-h*ZOOM/2,w*ZOOM,h*ZOOM);
 }
 
 function drawMap(c){
@@ -594,7 +477,6 @@ function drawMap(c){
   }
 
   const tile=900;
-
   const startX=Math.floor(c.x/tile)*tile-tile;
   const startY=Math.floor(c.y/tile)*tile-tile;
   const endX=c.x+c.w+tile;
@@ -602,15 +484,31 @@ function drawMap(c){
 
   for(let x=startX;x<endX;x+=tile){
     for(let y=startY;y<endY;y+=tile){
-      ctx.drawImage(
-        map,
-        screenX(x,c),
-        screenY(y,c),
-        tile*ZOOM,
-        tile*ZOOM
-      );
+      ctx.drawImage(map,screenX(x,c),screenY(y,c),tile*ZOOM,tile*ZOOM);
     }
   }
+}
+
+function drawFlashballInHands(c){
+  const px=player.x+player.aimX*28;
+  const py=player.y+player.aimY*12;
+
+  ctx.save();
+  ctx.translate(screenX(px,c),screenY(py,c));
+
+  if(player.aimX<0){
+    ctx.scale(-1,1);
+  }
+
+  ctx.drawImage(
+    assets.flashball,
+    -38*ZOOM,
+    -18*ZOOM,
+    76*ZOOM,
+    36*ZOOM
+  );
+
+  ctx.restore();
 }
 
 function draw(){
@@ -620,42 +518,46 @@ function draw(){
   drawMap(c);
 
   for(const e of effects){
-    if(e.type==="petFx"){
-      drawImg(assets.petFx,e.x,e.y,220,220,c);
-    }
-    if(e.type==="crepeFx"){
-      drawImg(assets.crepeFx,e.x,e.y,230,230,c);
-    }
+    if(e.type==="petFx")drawImg(assets.petFx,e.x,e.y,240,160,c);
+    if(e.type==="crepeFx")drawImg(assets.crepeFx,e.x,e.y,250,180,c);
   }
 
   for(const car of cars){
     ctx.save();
-    if(car.vx<0){
-      ctx.translate(screenX(car.x,c),screenY(car.y,c));
-      ctx.scale(-1,1);
-      ctx.drawImage(assets.kangou,-120*ZOOM,-60*ZOOM,240*ZOOM,120*ZOOM);
-    }else{
-      drawImg(assets.kangou,car.x,car.y,240,120,c);
-    }
+    ctx.translate(screenX(car.x,c),screenY(car.y,c));
+    if(car.vx<0)ctx.scale(-1,1);
+    ctx.drawImage(assets.kangou,-250*ZOOM,-120*ZOOM,500*ZOOM,240*ZOOM);
     ctx.restore();
   }
 
   for(const z of zombies){
-    drawImg(z.img,z.x,z.y,95,120,c);
+    drawImg(z.img,z.x,z.y,82,100,c);
 
     ctx.fillStyle="red";
-    ctx.fillRect(screenX(z.x,c)-25*ZOOM,screenY(z.y,c)-70*ZOOM,50*ZOOM,5*ZOOM);
+    ctx.fillRect(screenX(z.x,c)-24*ZOOM,screenY(z.y,c)-58*ZOOM,48*ZOOM,5*ZOOM);
     ctx.fillStyle="lime";
-    ctx.fillRect(screenX(z.x,c)-25*ZOOM,screenY(z.y,c)-70*ZOOM,50*ZOOM*(z.hp/z.maxHp),5*ZOOM);
+    ctx.fillRect(screenX(z.x,c)-24*ZOOM,screenY(z.y,c)-58*ZOOM,48*ZOOM*(z.hp/z.maxHp),5*ZOOM);
   }
 
   for(const b of bullets){
-    if(b.type==="flashball")drawImg(assets.flashball,b.x,b.y,55,35,c);
+    if(b.type==="flashball"){
+      ctx.fillStyle="#ffd35a";
+      ctx.beginPath();
+      ctx.arc(screenX(b.x,c),screenY(b.y,c),5*ZOOM,0,Math.PI*2);
+      ctx.fill();
+
+      ctx.fillStyle="#ff8a00";
+      ctx.beginPath();
+      ctx.arc(screenX(b.x,c),screenY(b.y,c),2*ZOOM,0,Math.PI*2);
+      ctx.fill();
+    }
+
     if(b.type==="crepe")drawImg(assets.crepe,b.x,b.y,55,55,c);
     if(b.type==="pet")drawImg(assets.pet,b.x,b.y,55,55,c);
   }
 
-  drawImg(player.img,player.x,player.y,120,150,c);
+  drawImg(player.img,player.x,player.y,100,100,c);
+  drawFlashballInHands(c);
 
   ctx.fillStyle="white";
   ctx.font="18px monospace";
